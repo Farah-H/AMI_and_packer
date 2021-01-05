@@ -1,0 +1,123 @@
+
+---
+- name: playbook for configuring app with nginx, nodejs and npm
+  hosts: app_server
+  gather_facts: yes
+  become: true
+  vars:
+    DB_HOST: "172.31.33.99"
+
+  tasks:
+    - name: Update and upgrade apt packages
+      apt:
+        upgrade: "yes"
+        update_cache: yes
+        cache_valid_time: 86400 #One day
+
+    - name: Install git
+      apt:
+        name: git
+        state: present
+        update_cache: yes
+
+    - name: Install software properties
+      apt:
+        name: software-properties-common
+        state: present
+
+    - name: Installing nginx, nodejs, npm
+      apt:
+        package:
+          - nginx
+          - nodejs
+          - npm
+        state: present
+
+
+    - name: install pm2
+      npm:
+        name: pm2
+        state: present
+        global: yes
+
+
+    - name: remove nginx default file from sites enabled (deleting a file)
+      file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+
+    # Create a file
+    - name: create file in sites available
+      file:
+        path: /etc/nginx/sites-available/default
+        state: touch
+        mode: 666
+
+    # Write into the file
+    - name: writing nginx config file
+      blockinfile:
+        path: /etc/nginx/sites-available/default
+        block: |
+          server{
+            listen 80;
+            server_name 172.31.36.244;
+            location / {
+                  proxy_pass http://34.255.160.143:3000/;
+            }
+          }
+
+    - name: create a symbolic link between sites enabled and available
+      file:
+        src: /etc/nginx/sites-available/default
+        dest: /etc/nginx/sites-enabled/default
+        state: link
+
+
+    - name: Restart Nginx
+      service:
+        name: nginx
+        state: restarted
+
+
+    - name: copies app folder, backs up the original if its different.
+      copy:
+        src: /home/ubuntu/app
+        dest: /home/ubuntu/app
+        owner: root
+        group: root
+        mode: 0644
+        backup: yes
+        
+    - name: DB_HOST set to db machine private ip
+      shell: |
+        export DB_HOST={{ DB_HOST }}
+        sed -i '/export DB_HOST=/d' .bashrc
+        printf '\nexport DB_HOST={{ DB_HOST }}' >> .bashrc
+      args:
+        chdir: /home/ubuntu
+
+    - name: cd_to_app
+      shell: |
+        pwd
+        cd app
+
+    - name: npm_install
+      apt:
+        name: npm
+        state: present
+
+    - name: stop app
+      shell:
+        chdir: app
+        cmd: pm2 stop app.js
+
+
+    - name: start app
+      shell:
+        chdir: app
+        cmd: pm2 start app.js
+
+
+
+
+
