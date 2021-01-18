@@ -1,7 +1,8 @@
 
 ---
 - name: playbook for configuring app with nginx, nodejs and npm
-  hosts: app_server
+  hosts: localhost
+  connection: local
   gather_facts: yes
   become: true
   vars:
@@ -12,6 +13,7 @@
       apt:
         upgrade: "yes"
         update_cache: yes
+        force_apt_get: yes
         cache_valid_time: 86400 #One day
 
     - name: Install git
